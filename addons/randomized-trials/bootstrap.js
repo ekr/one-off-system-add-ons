@@ -9,205 +9,157 @@ let {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/TelemetryController.jsm");
-Cu.import("resource://gre/modules/Task.jsm");
-const { setTimeout, clearTimeout } = Cu.import("resource://gre/modules/Timer.jsm", {});
+Cu.import("resource://gre/modules/ClientID.jsm");
 
-const VERSION_MAX_PREF = "security.tls.version.max";
+Cu.importGlobalProperties(["crypto", "TextEncoder"]);
+const DEBUG = true;
+const SEED_PREF = "moz.randomness_trials.v1.seed";
+const EXPERIMENTS = [
+  {
+    name: "exp1-enroll-all",
+    enrollment: 1,
+    pref: "dummy.pref.exp1-enroll-all",
+    arms: [
+      [ true, .5 ],
+      [ false, .5 ]
+    ]
+  },
+  {
+    name: "exp2-enroll-none",
+    enrollment: 0,
+    pref: "dummy.pref.exp2-enroll-none",
+    arms: [
+      [ true, .5 ],
+      [ false, .5 ]
+    ]
+  },
+  {
+    name: "exp3-enroll-second-arm",
+    enrollment: 1,
+    pref: "dummy.pref.exp3-enroll-all",
+    arms: [
+      [ true, .0001 ],
+      [ false, .9999 ]
+    ]
+  }
 
-// Timeout after 2 minutes.
-const TIMEOUT = "120000";
 
-// These should be different hosts so that we don't bias any performance test
-// toward 1.2.
-const URLs = {
-  "https://enabled.tls13.com/" : true,
-  "https://disabled.tls13.com/" : true,
-  "https://short.tls13.com/" : true,
-  "https://control.tls12.com/" : false
-};
-
-const DEBUG = false;
-
+];
+    
 let gStarted = false;
 let gPrefs = new Preferences({ defaultBranch: true });
 let gTimer;
 
 function debug(msg) {
     if (DEBUG) {
-        console.log(`TLSEXP: ${msg}`);
+        console.log(`RCT Addon: ${msg}`);
     }
 }
 
-// These variables are unreliable for some reason.
-function read(obj, field) {
-  try {
-    return obj[field];
-  } catch (e) {
-    Cu.reportError(e);
+function disable() {
+  Experiments.instance().disableExperiment("FROM_API");
+}
+
+function toHex(arr) {
+  let hexCodes = [];
+  for (let i = 0; i < arr.length; ++i) {
+    hexCodes.push(arr[i].toString(16).padStart(2, "0"));
   }
-  return undefined;
+
+  return hexCodes.join("");
 }
 
-function setTlsPref(prefs, value) {
-  debug("Setting pref to " + value);
-  prefs.set(VERSION_MAX_PREF, value);
+async function getRandomnessSeed() {
+  return await ClientID.getClientID();
 }
 
-// This might help us work out if there was a MitM
-function recordSecInfo(channel, result) {
-  let secInfo = channel.securityInfo;
-  if (secInfo instanceof Ci.nsITransportSecurityInfo) {
-    secInfo.QueryInterface(Ci.nsITransportSecurityInfo);
-    const isSecure = Ci.nsIWebProgressListener.STATE_IS_SECURE;
-    result.secure = !!(read(secInfo, 'securityState') & isSecure);
-    result.prError = read(secInfo, 'errorCode');
-  }
-  if (secInfo instanceof Ci.nsISSLStatusProvider) {
-    let sslStatus = secInfo.QueryInterface(Ci.nsISSLStatusProvider)
-        .SSLStatus.QueryInterface(Ci.nsISSLStatus);
-    let cert = read(sslStatus, 'serverCert');
-    result.certfp = read(cert, 'sha256Fingerprint');  // A hex string
-    result.version = read(sslStatus, 'protocolVersion');
-  }
+async function generateVariate(seed, label) {
+  const hasher = crypto.subtle;
+  const hash = await hasher.digest("SHA-256", new TextEncoder("utf-8").encode(seed + label));
+  let view = new DataView(hash);
+  return view.getUint32(0) / 0xffffffff;
 }
 
-function makeRequest(prefs, index, url, body) {
-  return new Promise(resolve => {
-    if (!gStarted) {
-      return;
-    }
+async function determineExperiments(experiments) {
+  let seed = await getRandomnessSeed();
+  let config = {
+    "seed" : seed,
+    "experiments": []
+  };
 
-    debug("Setting pref");
-    setTlsPref(prefs, URLs[url] ? 4 : 3);
-
-    let t0 = Date.now();
-    let req = Cc["@mozilla.org/xmlextras/xmlhttprequest;1"]
-        .createInstance(Ci.nsIXMLHttpRequest);
-      req.open(
-          body ? "POST" : "GET", url, true);
-    req.setRequestHeader("Content-Type", "application/json");
-
-    var result = {
-      "index" : index,
-      "url" : url,
-      "start_time" : t0
-    };
-    req.timeout = 10000; // 10s is low intentionally
-    req.addEventListener("error", e => {
-      debug("Finished with error");
-      let channel = e.target.channel;
-      let nsireq = channel.QueryInterface(Ci.nsIRequest);
-      result.error= nsireq ? nsireq.status : NS_ERROR_NOT_AVAILABLE;
-      recordSecInfo(channel, result);
-      result.elapsed = Date.now() - t0;
-      debug("Re-setting pref");
-      setTlsPref(prefs, 3);
-      resolve(result);
-    });
-    req.addEventListener("loadend", e => {
-      debug("Finished with load");
-      if (!gStarted) {
-        debug("Aborting.");
-        return;
-      }
-      result.status = e.target.status;
-      recordSecInfo(e.target.channel, result);
-      result.elapsed = Date.now() - t0;
-      debug("Resetting pref");
-      setTlsPref(prefs, 3);
-      resolve(result);
-    });
-
-    debug("Starting request for " + url + " TLS 1.3=" + URLs[url]);
-    if (body) {
-      req.send(JSON.stringify(body));
-    } else {
-      req.send();
-    }
-  });
-}
-
-/**
- * Report to telemetry with a custom ping.
- *
- * @param {String} status - one of "started", "report", "finished", "timedout"
- * @param {Array} result - optional, individual test results
- */
-function report(status, result) {
-  return TelemetryController.submitExternalPing(
-    "tls-13-study-v4",
-    {
-      time: Date.now(),
-      status: status,
-      results: result
-    }, {});
-}
-
-// Inefficient shuffle algorithm, but n <= 10
-function shuffleArray(orig) {
-  var inarr = [];
-  for (let i in orig) {
-    inarr.push(orig[i]);
-  }
-  var out = [];
-    while (inarr.length > 0) {
-        let x = Math.floor(Math.random() * inarr.length);
-        out.push(inarr.splice(x, 1)[0])
-  }
-  return out;
-}
-
-function startup() {} // eslint-disable-line no-unused-vars
-
-function shutdown() {} // eslint-disable-line no-unused-vars
-
-// This is a simple experiment:
-// - Install
-// - Enable TLS 1.3.
-// - Connect to a bunch of servers and record the results
-//   (see README.md for details on report format)
-function install() { // eslint-disable-line no-unused-vars
-  // Don't do anything if the user has already messed with this
-  // setting.
   let userprefs = new Preferences();
-  if (userprefs.isSet(VERSION_MAX_PREF)) {
-    console.log("User has changed TLS max version. Skipping");
+
+  for (let i in experiments) {
+    let e = experiments[i];
+    debug("Examining experiment " + e.name);
+    if (userprefs.isSet(e.pref)) {
+      debug("Preference " + e.pref + " already set. Skipping experiment " + e.name);
+    }
+    // Figure out if we are in the experiment.
+    let v = await generateVariate(seed, e.name + "-enrollment");
+    if (v >= e.enrollment) {
+      continue;
+    }
+    debug("Enrolling in experiment " + e.name);
+
+    // OK, we are in the experiment, now which arm.
+    v = await generateVariate(seed, e.name + "-arm");
+
+    let arm;
+    let cum = 0;
+    
+    for (let a in e.arms) {
+      cum += e.arms[a][1];
+      if (v < cum) {
+        arm = e.arms[a][0];
+        break;
+      }
+    }
+
+    if (arm === undefined) { 
+      debug("Misconfigured experiment " + e.name + " skipping");
+      continue;
+    }
+
+    debug("Selected arm="+arm);
+
+    config.experiments.push({
+      "name": e.name,
+      "pref": e.pref,
+      "arm": arm
+    });
+  }
+
+  debug("Experimental config:" + JSON.stringify(config));
+  
+  // OK, now we should have the whole experimental setup.
+  return config;
+}
+
+async function startup() {
+  // Seems startup() function is launched twice after install, we're
+  // unsure why so far. We only want it to run once.
+  if (gStarted) {
     return;
   }
 
-  // deadman timer to ensure we reset pref after 2 minutes
-  gTimer = setTimeout(() => {
-    try {
-      debug("compat test timed out");
-      gStarted = false;
-      setTlsPref(gPrefs, 3);
-      report("timedout");
-    } catch (ex) {
-      debug("timer failed:", ex);
-    }
-  }, TIMEOUT);
-
-  report("started");
-  gStarted = true;
-
-  let shuffled = shuffleArray(Object.keys(URLs));
-  let results = [];
-
-  Task.spawn(function* () {
-    for (var i in shuffled) {
-      results.push(yield makeRequest(gPrefs, i, shuffled[i], null));
-    }
-
-    report("report", results);
-
-  })
-    .catch(e => Cu.reportError(e))
-    .then(_ => {
-      // Make sure we re-set to TLS 1.2.
-      setTlsPref(gPrefs, 3);
-
-      clearTimeout(gTimer);
-      report("finished");
-    });
+  debug("Installing");
+  // Get the experimental config.
+  let config = await determineExperiments(EXPERIMENTS);
+    
+  // TODO: Somehow store which branch I am in.
+  
+  // Now impose the experimental config.
+  let prefs = new Preferences({ defaultBranch: true });
+  for (let e in config.experiments) {
+    prefs.set(config.experiments[e].pref, config.experiments[e].arm);
+  }
 }
-function uninstall() {} // eslint-disable-line no-unused-vars
+
+function shutdown() {
+  gStarted = false;
+}
+
+function install() {}
+function uninstall() {}
+
