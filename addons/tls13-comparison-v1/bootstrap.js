@@ -7,8 +7,6 @@
 let {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/Preferences.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/TelemetryController.jsm");
 Cu.import("resource://gre/modules/ClientID.jsm");
 
 Cu.importGlobalProperties(["crypto", "TextEncoder"]);
