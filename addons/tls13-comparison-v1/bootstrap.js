@@ -12,7 +12,7 @@ Cu.import("resource://gre/modules/TelemetryController.jsm");
 Cu.import("resource://gre/modules/ClientID.jsm");
 
 Cu.importGlobalProperties(["crypto", "TextEncoder"]);
-const DEBUG = true;
+const DEBUG = false;
 const ENABLE_PROB = .5;
 let gStarted = false;
 const kVERSION_MAX_PREF = "security.tls.version.max";
