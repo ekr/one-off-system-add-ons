@@ -8,7 +8,6 @@ let {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/ClientID.jsm");
-Cu.import("resource://gre/modules/Experiments.jsm");
 
 Cu.importGlobalProperties(["crypto", "TextEncoder"]);
 const DEBUG = false;
@@ -20,10 +19,6 @@ function debug(msg) {
     if (DEBUG) {
         console.log(`TLS 1.3 Test: ${msg}`);
     }
-}
-
-function disable() {
-  Experiments.instance().disableExperiment("FROM_API");
 }
 
 async function getRandomnessSeed() {
@@ -45,14 +40,12 @@ async function generateVariate(seed, label) {
   return view.getUint32(0) / 0xffffffff;
 }
 
-function startup(data, reason) {
+async function startup(data, reason) {
   // Don't do anything if the user has already messed with this
   // setting.
   let userprefs = new Preferences();
   if (userprefs.isSet(VERSION_MAX_PREF)) {
     console.log("User has changed TLS max version. Skipping");
-    experiments.setExperimentBranch(id, "skipped");
-    disable();
     return;
   }
   
@@ -73,10 +66,10 @@ function startup(data, reason) {
   // work properly on both Beta (where TLS 1.3 is on) and
   // Release (where TLS 1.3 is off).
   if (variate < ENABLE_PROB) {
-    debug("Setting TLS 1.3 on");
+    console.log("Setting TLS 1.3 on");
     prefs.set(VERSION_MAX_PREF, 4);
   } else {
-    debug("Setting TLS 1.3 off");
+    console.log("Setting TLS 1.3 off");
     prefs.set(VERSION_MAX_PREF, 3);
   }
 }
