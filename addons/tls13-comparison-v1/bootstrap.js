@@ -8,12 +8,13 @@ let {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/Preferences.jsm");
 Cu.import("resource://gre/modules/ClientID.jsm");
+Cu.import("resource://gre/modules/Experiments.jsm");
 
 Cu.importGlobalProperties(["crypto", "TextEncoder"]);
 const DEBUG = false;
 const ENABLE_PROB = .5;
 let gStarted = false;
-const kVERSION_MAX_PREF = "security.tls.version.max";
+const VERSION_MAX_PREF = "security.tls.version.max";
 
 function debug(msg) {
     if (DEBUG) {
@@ -44,11 +45,11 @@ async function generateVariate(seed, label) {
   return view.getUint32(0) / 0xffffffff;
 }
 
-async function startup(addon) {
+function startup(data, reason) {
   // Don't do anything if the user has already messed with this
   // setting.
   let userprefs = new Preferences();
-  if (userprefs.isSet(kVERSION_MAX_PREF)) {
+  if (userprefs.isSet(VERSION_MAX_PREF)) {
     console.log("User has changed TLS max version. Skipping");
     experiments.setExperimentBranch(id, "skipped");
     disable();
@@ -58,12 +59,13 @@ async function startup(addon) {
   // Seems startup() function is launched twice after install, we're
   // unsure why so far. We only want it to run once.
   if (gStarted) {
+    debug("Attempt to call startup twice. reason="+reason);
     return;
   }
 
   debug("Installing");
 
-  let variate = await generateVariate(getRandomnessSeed(), addon.id);
+  let variate = await generateVariate(getRandomnessSeed(), data.id);
   debug(variate);
   let prefs = new Preferences({ defaultBranch: true });
 
@@ -72,10 +74,10 @@ async function startup(addon) {
   // Release (where TLS 1.3 is off).
   if (variate < ENABLE_PROB) {
     debug("Setting TLS 1.3 on");
-    prefs.set(kVERSION_MAX_PREF, 4);
+    prefs.set(VERSION_MAX_PREF, 4);
   } else {
     debug("Setting TLS 1.3 off");
-    prefs.set(kVERSION_MAX_PREF, 3);
+    prefs.set(VERSION_MAX_PREF, 3);
   }
 }
 
