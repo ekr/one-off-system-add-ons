@@ -23,7 +23,6 @@ async function startup(data, reason) {
   // Seems startup() function is launched twice after install, we're
   // unsure why so far. We only want it to run once.
   if (gStarted) {
-    debug("Attempt to call startup twice. reason="+reason);
     return;
   }
 
