@@ -31,7 +31,7 @@ let configurations = [
   {label: "cf-tls13", versionMax: 4, versionFallbackLimit: 4, website: "https://enabled.tls13.com"},
   {label: "cf-tls12", versionMax: 4, versionFallbackLimit: 4, website: "https://disabled.tls13.com"},
   {label: "fb-tls13-18", versionMax: 4, versionFallbackLimit: 4, website: "https://www.tls13.facebook.com/"},
-  {label: "fb-tls13-18-sh", versionMax: 4, versionFallbackLimit: 4, website: "https://www.tls13.facebook.com/", tlsFlags : 0x40}
+  {label: "fb-tls13-18-sh", versionMax: 4, versionFallbackLimit: 4, website: "https://www.tls13.facebook.com/", tlsFlags: 0x40}
 ];
 
 let probe_id = null;
