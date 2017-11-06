@@ -26,12 +26,12 @@ const XHR_TIMEOUT = 10000;
 
 const TELEMETRY_PING_NAME = "tls13-middlebox-ghack";
 
-// all combination of configurations we care about.
+const GMAIL_URL= "https://mail.google.com/robots.txt";
+
 let configurations = [
-  {label: "cf-tls13", versionMax: 4, versionFallbackLimit: 4, website: "https://enabled.tls13.com"},
-  {label: "cf-tls12", versionMax: 4, versionFallbackLimit: 4, website: "https://disabled.tls13.com"},
-  {label: "google-tls13-control", versionMax: 4, versionFallbackLimit: 4, website: "https://mail.google.com/"},
-  {label: "google-tls13-experiment", versionMax: 4, versionFallbackLimit: 4, website: "https://mail.google.com/", tlsFlags: 0x40}
+    {label: "google-tls13-draft-18", versionMax: 4, versionFallbackLimit: 4, website: GMAIL_URL},
+    {label: "google-tls13-exp", versionMax: 4, versionFallbackLimit: 4, website: GMAIL_URL, tlsFlags: 0x40 },    
+    {label: "google-tls12", versionMax: 3, versionFallbackLimit: 3, website: GMAIL_URL}
 ];
 
 let probe_id = null;
@@ -168,7 +168,6 @@ function makeRequest(config) {
       xhr.channel.loadFlags |= Ci.nsIRequest.INHIBIT_PERSISTENT_CACHING;
       xhr.channel.loadFlags |= Ci.nsIRequest.LOAD_FRESH_CONNECTION;
       xhr.channel.loadFlags |= Ci.nsIRequest.LOAD_INITIAL_DOCUMENT_URI;
-
       xhr.channel.QueryInterface(Ci.nsIHttpChannelInternal);
       xhr.channel.tlsFlags = 0;
       xhr.channel.tlsFlags |= (config.versionMax << 0);
