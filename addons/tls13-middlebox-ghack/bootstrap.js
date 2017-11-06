@@ -24,7 +24,7 @@ const REPEAT_COUNT = 5;
 
 const XHR_TIMEOUT = 10000;
 
-const TELEMETRY_PING_NAME = "tls13-middlebox-alt-server-hello-1";
+const TELEMETRY_PING_NAME = "tls13-middlebox-ghack";
 
 // all combination of configurations we care about.
 let configurations = [
