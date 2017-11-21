@@ -29,9 +29,7 @@ const TELEMETRY_PING_NAME = "tls13-middlebox-ghack";
 const GMAIL_URL = "https://mail.google.com/robots.txt";
 
 let configurations = [
-  {label: "google-tls13-draft-18", versionMax: 4, versionFallbackLimit: 4, website: GMAIL_URL},
-  {label: "google-tls13-exp", versionMax: 4, versionFallbackLimit: 4, website: GMAIL_URL, tlsFlags: 0x40},
-  {label: "google-tls12", versionMax: 3, versionFallbackLimit: 3, website: "https://www.google.com/robots.txt"}
+  {label: "test", versionMax: 4, versionFallbackLimit: 4, website: "https://www.tls13.facebook.com"}
 ];
 
 let probe_id = null;
