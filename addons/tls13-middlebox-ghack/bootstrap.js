@@ -167,7 +167,7 @@ function makeRequest(config) {
       xhr.channel.loadFlags |= Ci.nsIRequest.INHIBIT_PIPELINE;
       xhr.channel.loadFlags |= Ci.nsIRequest.INHIBIT_PERSISTENT_CACHING;
       xhr.channel.loadFlags |= Ci.nsIRequest.LOAD_FRESH_CONNECTION;
-      xhr.channel.loadFlags |= Ci.nsIRequest.LOAD_INITIAL_DOCUMENT_URI;
+      xhr.channel.loadFlags |= Ci.nsIChannel.LOAD_INITIAL_DOCUMENT_URI;
       xhr.channel.QueryInterface(Ci.nsIHttpChannelInternal);
       xhr.channel.tlsFlags = 0;
       xhr.channel.tlsFlags |= (config.versionMax << 0);
