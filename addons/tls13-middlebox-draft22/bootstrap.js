@@ -24,14 +24,14 @@ const REPEAT_COUNT = 5;
 
 const XHR_TIMEOUT = 10000;
 
-const TELEMETRY_PING_NAME = "tls13-middlebox-ghack";
+const TELEMETRY_PING_NAME = "tls13-middlebox-draft22";
 
-const GMAIL_URL = "https://mail.google.com/robots.txt";
+const FACEBOOK_URL = "https://www.tls13.facebook.com/";
 
 let configurations = [
-  {label: "google-tls13-draft-18", versionMax: 4, versionFallbackLimit: 4, website: GMAIL_URL},
-  {label: "google-tls13-exp", versionMax: 4, versionFallbackLimit: 4, website: GMAIL_URL, tlsFlags: 0x40},
-  {label: "google-tls12", versionMax: 3, versionFallbackLimit: 3, website: GMAIL_URL}
+  {label: "fb-tls13-draft-22", versionMax: 4, versionFallbackLimit: 4, website: FACEBOOK_URL},
+  {label: "fb-tls13-draft22-compat", versionMax: 4, versionFallbackLimit: 4, website: FACEBOOK_URL, tlsFlags: 0x40},
+  {label: "fb-tls12", versionMax: 3, versionFallbackLimit: 3, website: FACEBOOK_URL}
 ];
 
 let probe_id = null;

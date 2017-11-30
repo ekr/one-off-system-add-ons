@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:em="http://www.mozilla.org/2004/em-rdf#">
   <Description about="urn:mozilla:install-manifest">
-    <em:id>tls13-middlebox-ghack@mozilla.org</em:id>
-    <em:version>2.0.0</em:version>
+    <em:id>tls13-middlebox-draft22@mozilla.org</em:id>
+    <em:version>1.0.0</em:version>
     <em:type>2</em:type>
     <em:bootstrap>true</em:bootstrap>
     <em:unpack>false</em:unpack>
